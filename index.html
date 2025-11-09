@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <title>YouTube Overlay</title>
+      <style>
+         html, body {
+         margin: 0;
+         width: 100%;
+         height: 100%;
+         background: transparent;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: white;
+         -webkit-user-select: none;
+         -moz-user-select: none;
+         -ms-user-select: none;
+         user-select: none;
+         }
+         #overlay {
+         position: relative;
+         width: 100%;
+         height: 100%;
+         border-radius: 25px;
+         display: flex;
+         flex-direction: column;
+         justify-content: center;
+         padding: 20px;
+         box-sizing: border-box;
+         overflow: hidden;
+         z-index: 1;
+         }
+         .border-animation {
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         pointer-events: none;
+         z-index: 10;
+         opacity: 0.5;
+         transition: opacity 0.4s ease;
+         }
+         #overlay:hover .border-animation {
+         opacity: 1;
+         }
+         .border-path {
+         fill: none;
+         stroke-width: 4;
+         stroke-linecap: round;
+         stroke-linejoin: round;
+         }
+         #track-path {
+         stroke: rgba(80, 80, 80, 0.5);
+         }
+         #line-path {
+         stroke: url(#line-gradient); 
+         stroke-dasharray: var(--line-length) var(--gap-length);
+         }
+         #overlay::before {
+         content: '';
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-image: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), var(--bg-image);
+         background-size: cover;
+         background-position: center;
+         z-index: -1;
+         opacity: 0.2;
+         transform: scale(var(--bg-scale, 1)); 
+         transition: opacity 0.4s ease, transform 0.1s ease-out, filter 0.3s ease-in-out;
+         }
+         #overlay:hover::before {
+         opacity: 0.7;
+         }
+         @keyframes scroll-gradient {
+         0% { background-position: 0% 50%; }
+         100% { background-position: -200% 50%; }
+         }
+         #overlay.gradient-gif-bg::before {
+         content: "";
+         position: absolute;
+         inset: 0;
+         background: linear-gradient(
+         90deg,
+         rgb(14, 14, 14) 0%,
+         rgba(36, 36, 36, 1) 25%,
+         rgba(51, 51, 51, 0.9) 50%,
+         rgba(36, 36, 36, 1) 75%,
+         rgba(14, 14, 14, 1) 100%
+         );
+         background-size: 200% 100%;
+         animation: scroll-gradient 6s ease-in-out infinite;
+         opacity: 0.2;
+         z-index: -1;
+         }
+         #overlay.settings-open::before {
+         filter: brightness(0.4) blur(2px);
+         }
+         #overlay.gradient-gif-bg:hover::before {
+         opacity: 0.7;
+         }
+         @keyframes gradient-animation {
+         0% { background-position: 0% 50%; }
+         50% { background-position: 100% 50%; }
+         100% { background-position: 0% 50%; }
+         }
+         #overlay.no-image::before {
+         background-image: linear-gradient(to right, #000000, #262626, #000000);
+         background-size: 200% 100%;
+         animation: gradient-animation 4s linear infinite;
+         }
+         .info-container {
+         width: 100%;
+         display: flex;
+         flex-direction: column;
+         position: relative;
+         opacity: 0.7;
+         transition: opacity 0.3s ease-in-out;
+         }
+         #overlay:hover .info-container {
+         opacity: 1;
+         }
+         .title {
+         font-size: 14px;
+         font-weight: bold;
+         width: 80%;
+         white-space: nowrap;
+         }
+         #overlay {
+         -webkit-app-region: drag;
+         }
+         .btn {
+         -webkit-app-region: no-drag;
+         }
+         .subtitle {
+         font-size: 14px;
+         opacity: 0.8;
+         }
+         .slider-container {
+         position: relative;
+         width: 100%;
+         margin-bottom: 4px;
+         -webkit-app-region: no-drag;
+         opacity: 0.5;
+         }
+         #overlay:hover .slider-container {
+         opacity: 1;
+         }
+         #time-tooltip {
+         position: absolute;
+         bottom: 20px;
+         transform: translateX(-50%);
+         background-color: rgba(63, 63, 63, 0.75);
+         color: white;
+         padding: 4px 8px;
+         border-radius: 4px;
+         font-size: 12px;
+         white-space: nowrap;
+         pointer-events: none;
+         opacity: 0;
+         transition: opacity 0.1s ease-in-out;
+         z-index: 10;
+         }
+         input[type=range] {
+         -webkit-appearance: none;
+         width: 100%;
+         height: 4px;
+         background: linear-gradient(to right,
+         #e34e39 0%,
+         #e35684 var(--progress-percent, 0%),
+         #7a7a7a var(--progress-percent, 0%),
+         #7a7a7a var(--preview-percent, 0%),
+         #4d4d4d var(--preview-percent, 0%),
+         #4d4d4d 100%
+         );
+         border-radius: 4px;
+         outline: none;
+         cursor: pointer;
+         transition: height 0.2s ease;
+         }
+         input[type=range]:hover {
+         height: 6px;
+         }
+         input[type=range]::-webkit-slider-thumb {
+         -webkit-appearance: none;
+         width: 14px;
+         height: 14px;
+         border-radius: 50%;
+         background: #e34e39;
+         cursor: pointer;
+         border: none;
+         transform: scale(0);
+         opacity: 0;
+         transition: transform 0.2s ease, opacity 0.2s ease;
+         }
+         input[type=range]:hover::-webkit-slider-thumb {
+         transform: scale(1);
+         opacity: 1;
+         }
+         input[type=range]:active::-webkit-slider-thumb {
+         transform: scale(1.2);
+         }
+         .time {
+         display: flex;
+         justify-content: space-between;
+         font-size: 12px;
+         opacity: 0.8;
+         padding: 0 2px;
+         }
+         .buttons {
+         display: flex;
+         justify-content: space-around;
+         align-items: center;
+         height: 50%;
+         width: 100%;
+         }
+         .btn {
+         cursor: pointer;
+         user-select: none;
+         padding: 8px;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         fill: white;
+         position: relative;
+         border-radius: 50%;
+         z-index: 1;
+         overflow: hidden;
+         transition: background-color 0.2s ease;
+         }
+         .btn::before {
+         content: '';
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-color: rgba(255, 255, 255, 0.15);
+         border-radius: 50%;
+         transform: scale(0);
+         opacity: 0;
+         transition: transform 0.2s ease, opacity 0.2s ease;
+         z-index: -1;
+         }
+         .btn:hover::before {
+         transform: scale(1);
+         opacity: 1;
+         }
+         .buttons .btn {
+         margin-top: 4px;
+         width: 30px;
+         height: 30px;
+         }
+         .buttons .btn svg {
+         width: 20px;
+         height: 20px;
+         }
+         .btn svg {
+         width: 28px;
+         height: 28px;
+         }
+         #btn-play svg {
+         width: 32px;
+         height: 32px;
+         }
+         #btn-shuffle svg, #btn-repeat svg {
+         fill: #909090;
+         transition: fill 0.2s ease;
+         }
+         #btn-shuffle.active svg, #btn-repeat.active svg {
+         fill: white;
+         }
+         #settings-btn {
+         position: absolute;
+         top: 14px;
+         right: 14px;
+         width: 20px;
+         height: 20px;
+         cursor: pointer;
+         z-index: 20;
+         opacity: 0;
+         transition: opacity 0.3s ease;
+         -webkit-app-region: no-drag;
+         }
+         #settings-btn:hover {
+         opacity: 1;
+         }
+         #settings-btn svg {
+         width: 100%;
+         height: 100%;
+         fill: #909090;
+         }
+         #settings-panel {
+         position: absolute;
+         top: 15px;
+         left: 26px;
+         width: calc(85% - 20px);
+         height: calc(100% - 30px);
+         opacity: 0;
+         pointer-events: none;
+         display: flex;
+         -webkit-app-region: no-drag;
+         flex-direction: column;
+         border-radius: 10px;
+         overflow-y: auto;
+         -ms-overflow-style: none;
+         scrollbar-width: none;
+         transition: opacity 0.4s ease, transform 0.1s ease-out, filter 0.3s ease-in-out;
+         }
+         #settings-panel::-webkit-scrollbar {
+         display: none;
+         }
+         .setting-box {
+         margin-bottom: 10px;
+         }
+         .setting-item {
+         display: flex;
+         align-items: center;
+         justify-content: space-between;
+         -webkit-app-region: no-drag;
+         }
+         .setting-label {
+         font-size: 14px;
+         font-weight: bold;
+         }
+         .toggle-switch {
+         position: relative;
+         display: inline-block;
+         width: 35px;
+         height: 14px;
+         }
+         .toggle-switch input {
+         opacity: 0;
+         width: 0;
+         height: 0;
+         }
+         .toggle-slider {
+         position: absolute;
+         cursor: pointer;
+         top: 0;
+         left: 0;
+         right: 0;
+         bottom: 0;
+         background-color: #717171;
+         transition: .4s;
+         border-radius: 12px;
+         }
+         .toggle-slider:before {
+         position: absolute;
+         content: "";
+         height: 18px;
+         width: 18px;
+         left: -2px;
+         top: 50%;
+         transform: translateY(-50%);
+         background-color: #909090;
+         transition: .4s;
+         border-radius: 50%;
+         }
+         input:checked + .toggle-slider {
+         background-color: var(--toggle-checked-bg, #375570);
+         }
+         input:checked + .toggle-slider:before {
+         transform: translateX(19px) translateY(-50%);
+         background-color: var(--toggle-checked-handle-bg, #3ea6ff);
+         }
+         .settings-desc {
+         display: inline-block;
+         color: #a2a2a2;
+         font-size: 12px;
+         max-width: 85%;
+         overflow: hidden;
+         }
+         .separator {
+         width: 100%;
+         min-height: 2px;
+         border-radius: 5px;
+         background-color: #909090;
+         margin-top: 2px;
+         margin-bottom: 12px;
+         opacity: 40%;
+         }
+         #overlay.settings-open .info-container {
+         opacity: 0;
+         pointer-events: none;
+         }
+         #overlay.settings-open #settings-panel {
+         opacity: 1;
+         pointer-events: auto;
+         }
+      </style>
+   </head>
+   <body>
+      <div id="overlay" class="no-image">
+         <div id="settings-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+               <path d="M12.844 1h-1.687a2 2 0 00-1.962 1.616 3 3 0 01-3.92 2.263 2 2 0 00-2.38.891l-.842 1.46a2 2 0 00.417 2.507 3 3 0 010 4.525 2 2 0 00-.417 2.507l.843 1.46a2 2 0 002.38.892 3.001 3.001 0 013.918 2.263A2 2 0 0011.157 23h1.686a2 2 0 001.963-1.615 3.002 3.002 0 013.92-2.263 2 2 0 002.38-.892l.842-1.46a2 2 0 00-.418-2.507 3 3 0 010-4.526 2 2 0 00.418-2.508l-.843-1.46a2 2 0 00-2.38-.891 3 3 0 01-3.919-2.263A2 2 0 0012.844 1Zm-1.767 2.347a6 6 0 00.08-.347h1.687a4.98 4.98 0 002.407 3.37 4.98 4.98 0 004.122.4l.843 1.46A4.98 4.98 0 0018.5 12a4.98 4.98 0 001.716 3.77l-.843 1.46a4.98 4.98 0 00-4.123.4A4.979 4.979 0 0012.843 21h-1.686a4.98 4.98 0 00-2.408-3.371 4.999 4.999 0 00-4.12-.399l-.844-1.46A4.979 4.979 0 005.5 12a4.98 4.98 0 00-1.715-3.77l.842-1.459a4.98 4.98 0 004.123-.399 4.981 4.981 0 002.327-3.025ZM16 12a4 4 0 11-7.999 0 4 4 0 018 0Zm-4 2a2 2 0 100-4 2 2 0 000 4Z"></path>
+            </svg>
+         </div>
+         <div class="info-container">
+            <div class="title">Title</div>
+            <div class="subtitle">Subtitle</div>
+            <div class="slider-container">
+               <div id="time-tooltip">0:00</div>
+               <input id="progress" type="range" min="0" max="1000" value="0">
+            </div>
+            <div class="time">
+               <span id="current-time">0:00</span>
+               <span id="total-time">0:00</span>
+            </div>
+            <div class="buttons">
+               <div id="btn-shuffle" class="btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M16.293 13.293a1 1 0 011.414 0L22.414 18l-4.707 4.707a1 1 0 01-1.414-1.413L18.586 19H17.21a7.001 7.001 0 01-5.824-3.117l-.186-.278 1.202-1.803.648.972A5.001 5.001 0 0017.21 17h1.375l-2.293-2.293a1 1 0 010-1.414Zm0-12a1 1 0 011.414 0L22.414 6l-4.707 4.707a1 1 0 01-1.414-1.414L18.586 7H17.21a5 5 0 00-4.16 2.227l-4.438 6.656A7 7 0 012.79 19H2a1 1 0 010-2h.79a5 5 0 004.16-2.226l4.437-6.656A7 7 0 0117.21 5h1.375l-2.293-2.292a1 1 0 010-1.415ZM3 10.001a2 2 0 110 4 2 2 0 010-4Zm-.21-5a7 7 0 015.823 3.117l.185.277-1.202 1.803-.647-.971A5 5 0 002.79 7H2a1 1 0 010-2h.79Z"></path>
+                  </svg>
+               </div>
+               <div id="btn-prev" class="btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M4 4a1 1 0 00-1 1v14a1 1 0 102 0V5a1 1 0 00-1-1Zm14.955.23L6 12.003l12.955 7.772A1.35 1.35 0 0021 18.617V5.387a1.35 1.35 0 00-2.045-1.157Z"></path>
+                  </svg>
+               </div>
+               <div id="btn-play" class="btn">
+                  <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M5 4.623V19.38a1.5 1.5 0 002.26 1.29L22 12 7.26 3.33A1.5 1.5 0 005 4.623Z"></path>
+                  </svg>
+                  <svg id="icon-pause" style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M6.5 3A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h2a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 008.5 3h-2Zm9 0A1.5 1.5 0 0014 4.5v15a1.5 1.5 0 001.5 1.5h2a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0017.5 3h-2Z"></path>
+                  </svg>
+               </div>
+               <div id="btn-next" class="btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M20 20a1 1 0 001-1V5a1 1 0 00-2 0v14a1 1 0 001 1Zm-14.955-.226L18 12 5.045 4.228A1.35 1.35 0 003 5.386v13.23a1.35 1.35 0 002.045 1.158Z"></path>
+                  </svg>
+               </div>
+               <div id="btn-repeat" class="btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                     <path d="M21 10a1 1 0 011 1v4a5 5 0 01-5 5H5.414l1.293 1.293a1 1 0 11-1.414 1.414L1.586 19l3.707-3.707a1 1 0 111.414 1.414L5.414 18H17a3 3 0 003-3v-4a1 1 0 011-1Zm-3.707-8.707a1 1 0 011.414 0L22.414 5l-3.707 3.707a1 1 0 11-1.414-1.414L18.586 6H7a3 3 0 00-3 3v4a1 1 0 01-2 0V9a5 5 0 015-5h11.586l-1.293-1.293a1 1 0 010-1.414ZM12 10a2 2 0 110 4 2 2 0 010-4Z"></path>
+                  </svg>
+               </div>
+            </div>
+         </div>
+         <div id="settings-panel">
+            <div class="setting-box">
+               <div class="setting-item">
+                  <span class="setting-label">Border Animation</span>
+                  <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-border-anim">
+                  <span class="toggle-slider"></span>
+                  </label>
+               </div>
+               <span class="settings-desc">Animation of two bars rotating around the box, synchronized with the currently playing music.</span>
+            </div>
+            <div class="separator"></div>
+            <div class="setting-box">
+               <div class="setting-item">
+                  <span class="setting-label">Border Glow</span>
+                  <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-border-glow">
+                  <span class="toggle-slider"></span>
+                  </label>
+               </div>
+               <span class="settings-desc">Glow for bars rotating around the box. Border Animation is required for this to work properly.</span>
+            </div>
+            <div class="separator"></div>
+            <div class="setting-box">
+               <div class="setting-item">
+                  <span class="setting-label">Background Bass Animation</span>
+                  <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-bass-anim">
+                  <span class="toggle-slider"></span>
+                  </label>
+               </div>
+               <span class="settings-desc">Enlarge and reduce the background image of a song based on the song's bass</span>
+            </div>
+            <div class="separator"></div>
+            <div class="setting-box">
+               <div class="setting-item">
+                  <span class="setting-label">Static Background Image</span>
+                  <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-static-image">
+                  <span class="toggle-slider"></span>
+                  </label>
+               </div>
+               <span class="settings-desc">Captures the background only once per song to improve performance. Otherwise, it's captured continuously (like a video).</span>
+            </div>
+         </div>
+         <svg class="border-animation" viewBox="0 0 400 200" preserveAspectRatio="none">
+            <defs>
+               <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#e34e39" />
+                  <stop offset="100%" stop-color="#e35684" />
+               </linearGradient>
+               <filter id="glow">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blurResult" />
+                  <feMerge>
+                     <feMergeNode in="blurResult" />
+                     <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+               </filter>
+            </defs>
+            <path class="border-path" id="track-path"
+               d="M 30,2 H 370 A 30,30 0 0 1 398,32 V 168 A 30,30 0 0 1 370,198 H 30 A 30,30 0 0 1 2,168 V 32 A 30,30 0 0 1 30,2 Z"
+               fill="none" />
+            <path class="border-path" id="line-path"
+               d="M 30,2 H 370 A 30,30 0 0 1 398,32 V 168 A 30,30 0 0 1 370,198 H 30 A 30,30 0 0 1 2,168 V 32 A 30,30 0 0 1 30,2 Z"
+               fill="none" />
+         </svg>
+      </div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.4.0/color-thief.min.js"></script>
+      <script>
+         const config = {
+             enableBorderAnimation: true,
+             enableBassBackgroundAnimation: true,
+             enableBorderGlow: true,
+             enableStaticImage: false 
+         };
+         const { ipcRenderer } = require('electron');
+         
+         const overlayEl = document.getElementById("overlay");
+         const titleEl = document.querySelector(".title");
+         const subtitleEl = document.querySelector(".subtitle");
+         const currentEl = document.getElementById("current-time");
+         const totalEl = document.getElementById("total-time");
+         const slider = document.getElementById("progress");
+         const timeTooltip = document.getElementById('time-tooltip');
+         
+         const btnPrev = document.getElementById("btn-prev");
+         const btnPlay = document.getElementById("btn-play");
+         const btnNext = document.getElementById("btn-next");
+         const btnShuffle = document.getElementById("btn-shuffle");
+         const btnRepeat = document.getElementById("btn-repeat");
+         
+         const iconPlay = document.getElementById('icon-play');
+         const iconPause = document.getElementById('icon-pause');
+         
+         const settingsBtn = document.getElementById('settings-btn');
+         const infoContainer = document.querySelector('.info-container');
+         const settingsPanel = document.getElementById('settings-panel');
+         const toggleBorderAnim = document.getElementById('toggle-border-anim');
+         const toggleBorderGlow = document.getElementById('toggle-border-glow');
+         const toggleBassAnim = document.getElementById('toggle-bass-anim');
+         const toggleStaticImage = document.getElementById('toggle-static-image');
+         const borderSvg = document.querySelector('.border-animation');
+         let settingsVisible = false;
+         
+         let linePath, totalLength = 0, currentOffset = 0, speedFactor = 0, lastTimestamp = 0, previousScale = 1.0; sameScaleCount = 0; previousScale = 1;
+         
+         const PATHS = {
+             SHUFFLE_ON: "M16.293 1.293a1 1 0 00-.001 1.415L18.585 5H17.21a7 7 0 00-5.823 3.118L6.95 14.774A5 5 0 012.79 17H2a1 1 0 000 2h.79a7 7 0 005.822-3.117l4.438-6.656A5 5 0 0117.21 7h1.376l-2.293 2.293a1 1 0 001.414 1.414L22.414 6l-4.707-4.707a1 1 0 00-1.414 0ZM2.789 5H2a1 1 0 000 2h.79a5 5 0 014.159 2.227l.647.97 1.202-1.802-.185-.277A7 7 0 002.789 5Zm13.504 8.293a1 1 0 00-.001 1.414L18.585 17H17.21a5 5 0 01-4.16-2.226l-.648-.972-1.202 1.803.186.278A7 7 0 0017.21 19h1.376l-2.293 2.294-.068.076a1 1 0 001.406 1.406l.076-.07L22.414 18l-4.707-4.707a1 1 0 00-1.414 0Z",
+             SHUFFLE_OFF: "M16.293 13.293a1 1 0 011.414 0L22.414 18l-4.707 4.707a1 1 0 01-1.414-1.413L18.586 19H17.21a7.001 7.001 0 01-5.824-3.117l-.186-.278 1.202-1.803.648.972A5.001 5.001 0 0017.21 17h1.375l-2.293-2.293a1 1 0 010-1.414Zm0-12a1 1 0 011.414 0L22.414 6l-4.707 4.707a1 1 0 01-1.414-1.414L18.586 7H17.21a5 5 0 00-4.16 2.227l-4.438 6.656A7 7 0 012.79 19H2a1 1 0 010-2h.79a5 5 0 004.16-2.226l4.437-6.656A7 7 0 0117.21 5h1.375l-2.293-2.292a1 1 0 010-1.415ZM3 10.001a2 2 0 110 4 2 2 0 010-4Zm-.21-5a7 7 0 015.823 3.117l.185.277-1.202 1.803-.647-.971A5 5 0 002.79 7H2a1 1 0 010-2h.79Z",
+             REPEAT_ALL: "M17.293 1.293a1 1 0 000 1.415L18.586 4H7a5 5 0 00-5 5v4a1 1 0 102 0V9a3 3 0 013-3h11.586l-1.293 1.293a1 1 0 001.414 1.415L22.414 5l-3.707-3.707a1 1 0 00-1.414 0ZM21 10a1 1 0 00-1 1v4a3 3 0 01-3 3H5.414l1.293-1.292a1.001 1.001 0 00-1.414-1.415L1.586 19l3.707 3.707a1 1 0 101.414-1.413L5.414 20H17a5 5 0 005-5v-4a1 1 0 00-1-1Z",
+             REPEAT_OFF: "M21 10a1 1 0 011 1v4a5 5 0 01-5 5H5.414l1.293 1.293a1 1 0 11-1.414 1.414L1.586 19l3.707-3.707a1 1 0 111.414 1.414L5.414 18H17a3 3 0 003-3v-4a1 1 0 011-1Zm-3.707-8.707a1 1 0 011.414 0L22.414 5l-3.707 3.707a1 1 0 11-1.414-1.414L18.586 6H7a3 3 0 00-3 3v4a1 1 0 01-2 0V9a5 5 0 015-5h11.586l-1.293-1.293a1 1 0 010-1.414ZM12 10a2 2 0 110 4 2 2 0 010-4Z",
+             REPEAT_ONE: "M17.293 1.293a1 1 0 000 1.415L18.586 4H7a5 5 0 00-5 5v4a1 1 0 102 0V9a3 3 0 013-3h11.586l-1.293 1.293a1 1 0 001.414 1.415L22.414 5l-3.707-3.707a1 1 0 00-1.414 0ZM13 15V8h-2.5a1 1 0 000 2h.5v5a1 1 0 002 0Zm8-5a1 1 0 00-1 1v4a3 3 0 01-3 3H5.414l1.293-1.292a1.001 1.001 0 00-1.414-1.415L1.586 19l3.707 3.707a1 1 0 101.414-1.413L5.414 20H17a5 5 0 005-5v-4a1 1 0 00-1-1Z"
+         };
+         
+         let isDragging = false;
+         let currentImageUrl = "";
+         let totalDurationInSeconds = 0;
+         let ignoreServerPlayState = false;
+         let ignoreServerShuffleState = false;
+         let ignoreServerRepeatState = false;
+         const saveSettings = () => {
+            localStorage.setItem('playerSettings', JSON.stringify(config));
+        };
+
+        const loadSettings = () => {
+            const savedSettings = localStorage.getItem('playerSettings');
+            if (savedSettings) {
+                Object.assign(config, JSON.parse(savedSettings));
+            }
+        };
+         function updateBorderGradient(colors) {
+             const gradient = document.getElementById('line-gradient');
+             if (!gradient || colors.length === 0) return;
+         
+             if (colors.length >= 2) {
+                 const darkenedColor1 = darkenColor(colors[0], 0.4); 
+                 const color2 = colors[1];
+         
+                 const toggleBgColor = `rgb(${darkenedColor1.join(', ')})`;
+                 const toggleHandleColor = `rgb(${color2.join(', ')})`;
+                 
+                 document.documentElement.style.setProperty('--toggle-checked-bg', toggleBgColor);
+                 document.documentElement.style.setProperty('--toggle-checked-handle-bg', toggleHandleColor);
+             }
+         
+             const colorStops = colors.map(color => `rgb(${color[0]}, ${color[1]}, ${color[2]})`).join(', ');
+             const gradientString = `linear-gradient(to right, ${colorStops})`;
+         
+             document.querySelectorAll('.separator').forEach(sep => {
+                 sep.style.background = gradientString;
+             });
+             while (gradient.firstChild) {
+                 gradient.removeChild(gradient.firstChild);
+             }
+         
+             colors.forEach((color, index) => {
+                 const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                 const offset = colors.length > 1 ? (index / (colors.length - 1)) * 100 : 0;
+                 stop.setAttribute('offset', `${offset}%`);
+                 stop.setAttribute('stop-color', `rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+                 gradient.appendChild(stop);
+             });
+         }
+         function darkenColor(rgbColor, factor) {
+             const r = Math.max(0, Math.floor(rgbColor[0] * (1 - factor)));
+             const g = Math.max(0, Math.floor(rgbColor[1] * (1 - factor)));
+             const b = Math.max(0, Math.floor(rgbColor[2] * (1 - factor)));
+             return [r, g, b];
+         }
+         function setDefaultBorderGradient() {
+             updateBorderGradient([
+                 [227, 78, 57],
+                 [227, 86, 132]
+             ]);
+         }
+         
+         const updateSliderStyle = () => {
+             const percentage = (slider.value / slider.max) * 100;
+             slider.style.setProperty('--progress-percent', `${percentage}%`);
+             if (!slider.matches(':hover')) {
+                  slider.style.setProperty('--preview-percent', `${percentage}%`);
+             }
+         };
+         const formatTime = (totalSeconds) => {
+             const minutes = Math.floor(totalSeconds / 60);
+             const seconds = Math.floor(totalSeconds % 60);
+             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+         };
+         const handleSliderMouseMove = (e) => {
+             if (totalDurationInSeconds === 0) return;
+             const rect = slider.getBoundingClientRect();
+             const mouseX = e.clientX - rect.left;
+             const width = rect.width;
+             const hoverX = Math.max(0, Math.min(mouseX, width));
+             const hoverRatio = hoverX / width;
+             slider.style.setProperty('--preview-percent', `${hoverRatio * 100}%`);
+             const previewSeconds = hoverRatio * totalDurationInSeconds;
+             timeTooltip.textContent = formatTime(previewSeconds);
+             timeTooltip.style.left = `${hoverX}px`;
+         };
+         const handleSliderMouseLeave = () => {
+             const progressPercent = (slider.value / slider.max) * 100;
+             slider.style.setProperty('--preview-percent', `${progressPercent}%`);
+             timeTooltip.style.opacity = '0';
+         };
+         const handleSliderMouseEnter = () => {
+             if (totalDurationInSeconds > 0) {
+                 timeTooltip.style.opacity = '1';
+             }
+         };
+         const timeToSeconds = (timeStr) => {
+             if (!timeStr || !timeStr.includes(':')) return 0;
+             const parts = timeStr.split(":").map(Number);
+             if (parts.length !== 2) return 0;
+             return (parts[0] * 60) + parts[1];
+         };
+         
+         function setPlayState(isPlaying) {
+           if (isPlaying) {
+             iconPlay.style.display = 'none';
+             iconPause.style.display = 'block';
+           } else {
+             iconPlay.style.display = 'block';
+             iconPause.style.display = 'none';
+           }
+         };
+         
+        ipcRenderer.on("update-data", (event, data) => {
+           if (!data) return;
+         
+           const MAX_TITLE_LENGTH = 35;
+           function truncateTitle(title) {
+               if (title.length > MAX_TITLE_LENGTH) {
+                   return title.slice(0, MAX_TITLE_LENGTH) + "...";
+               }
+               return title;
+           }
+           titleEl.textContent = truncateTitle(data.title || "Title");
+           subtitleEl.textContent = truncateTitle(data.subtitle) || "Subtitle";
+         
+           const newImageUrl = data.image || "";
+           if (currentImageUrl !== newImageUrl) {
+               overlayEl.classList.remove('no-image', 'gradient-gif-bg');
+         
+               if (newImageUrl && newImageUrl.startsWith("data:image/gif;base64")) {
+                   overlayEl.style.setProperty('--bg-image', 'none');
+                   overlayEl.classList.add('gradient-gif-bg');
+                   setDefaultBorderGradient();
+               } else if (newImageUrl) {
+                   overlayEl.style.setProperty('--bg-image', `url('${newImageUrl}')`);
+                   
+                   const colorThief = new ColorThief();
+                   const img = new Image();
+                   img.crossOrigin = 'Anonymous';
+         
+                   img.onload = function() {
+                       try {
+                         const palette = colorThief.getPalette(img, 4);
+                         if (palette) {
+                             updateBorderGradient(palette);
+                         }
+                       } catch (e) {
+                         setDefaultBorderGradient();
+                       }
+                   };
+                   img.onerror = function() {
+                       setDefaultBorderGradient();
+                   }
+                   img.src = newImageUrl;
+         
+               } else {
+                   overlayEl.style.setProperty('--bg-image', 'none');
+                   overlayEl.classList.add('no-image');
+                   setDefaultBorderGradient();
+               }
+               currentImageUrl = newImageUrl;
+           }
+         
+           const times = (data.time || "0:00 / 0:00").split(" / ");
+           if (times.length === 2) {
+             currentEl.textContent = times[0];
+             totalEl.textContent = times[1];
+             const currentSeconds = timeToSeconds(times[0]);
+             totalDurationInSeconds = timeToSeconds(times[1]);
+             if (totalDurationInSeconds > 0 && !isDragging) {
+                 slider.value = (currentSeconds / totalDurationInSeconds) * 1000;
+             } else if (!isDragging) {
+                 slider.value = 0;
+             }
+             updateSliderStyle();
+           }
+         
+           if (!ignoreServerPlayState) {
+             setPlayState(data.running === 1);
+           }
+         
+           if (!ignoreServerShuffleState) {
+             const shufflePathEl = btnShuffle.querySelector('svg path');
+             btnShuffle.classList.toggle('active', data.shuffle !== 1);
+             shufflePathEl.setAttribute('d', data.shuffle === 1 ? PATHS.SHUFFLE_ON : PATHS.SHUFFLE_OFF);
+           }
+         
+           if (!ignoreServerRepeatState) {
+             const repeatPathEl = btnRepeat.querySelector('svg path');
+             switch(data.repeat) {
+                 case 1:
+                     btnRepeat.classList.add('active');
+                     repeatPathEl.setAttribute('d', PATHS.REPEAT_OFF);
+                     break;
+                 case 3:
+                     btnRepeat.classList.add('active');
+                     repeatPathEl.setAttribute('d', PATHS.REPEAT_ONE);
+                     break;
+                 case 2:
+                 default:
+                     btnRepeat.classList.remove('active');
+                     repeatPathEl.setAttribute('d', PATHS.REPEAT_ALL);
+                     break;
+             }
+           }
+         
+           
+         
+         const bassValue = data.bassIntensity || 0;
+         const minSpeed = 50;
+         const maxSpeed = 500;
+             
+         speedFactor = minSpeed + (bassValue / 100) * (maxSpeed - minSpeed);
+         
+         const minScale = 1.0;
+         const maxScale = 1.1;
+         let scale = minScale + (bassValue / 100) * (maxScale - minScale);
+         
+         if (bassValue == 100) {
+             speedFactor = 2000;
+             scale = 1.2;
+         } else if (bassValue > 99) {
+             speedFactor = 1800;
+             scale = 1.16;
+         } else if (bassValue > 98) {
+             speedFactor = 1400;
+             scale = 1.15;
+         } else if (bassValue > 97) {
+             speedFactor = 800;
+             scale = 1.13;
+         } else if (bassValue > 95) {
+             speedFactor = 700;
+             scale = 1.12;
+         } else if (bassValue > 86) {
+             speedFactor = 600;
+             scale = 1.11;
+         }
+         
+         if (Math.abs(scale - previousScale) < 0.01) {
+             sameScaleCount++;
+         } else {
+             sameScaleCount = 0;
+         }
+         
+         if (sameScaleCount >= 2 && scale > 0.15) {
+             scale -= 0.02;
+             sameScaleCount = 0;
+         }
+         
+         if (config.enableBassBackgroundAnimation) {
+             overlayEl.style.setProperty('--bg-scale', scale);
+         }
+         if (scale < minScale) {
+             scale = minScale;
+         }
+         previousScale = scale;
+         });
+         
+         btnPlay.addEventListener("click", () => {
+           const isCurrentlyPlaying = iconPause.style.display === 'block';
+           setPlayState(!isCurrentlyPlaying);
+           ipcRenderer.send('control', { action: 'playPause' });
+         
+           ignoreServerPlayState = true;
+           setTimeout(() => {
+             ignoreServerPlayState = false;
+           }, 500);
+         });
+         btnNext.addEventListener("click", () => ipcRenderer.send('control', { action: 'next' }));
+         btnPrev.addEventListener("click", () => ipcRenderer.send('control', { action: 'prev' }));
+         btnShuffle.addEventListener("click", () => {
+           const shufflePathEl = btnShuffle.querySelector('svg path');
+           const isCurrentlyActive = btnShuffle.classList.contains('active');
+           if (isCurrentlyActive) {
+             btnShuffle.classList.remove('active');
+             shufflePathEl.setAttribute('d', PATHS.SHUFFLE_ON);
+           } else {
+             btnShuffle.classList.add('active');
+             shufflePathEl.setAttribute('d', PATHS.SHUFFLE_OFF);
+           }
+           ipcRenderer.send('control', { action: 'toggleShuffle' });
+         
+           ignoreServerShuffleState = true;
+           setTimeout(() => {
+             ignoreServerShuffleState = false;
+           }, 500);
+         });
+         btnRepeat.addEventListener("click", () => {
+           const repeatPathEl = btnRepeat.querySelector('svg path');
+           const currentPath = repeatPathEl.getAttribute('d');
+         
+           if (currentPath === PATHS.REPEAT_ALL) {
+             btnRepeat.classList.add('active');
+             repeatPathEl.setAttribute('d', PATHS.REPEAT_OFF);
+           } else if (currentPath === PATHS.REPEAT_ONE) {
+             btnRepeat.classList.remove('active');
+             repeatPathEl.setAttribute('d', PATHS.REPEAT_ALL);
+           } else {
+             btnRepeat.classList.add('active');
+             repeatPathEl.setAttribute('d', PATHS.REPEAT_ONE);
+           }
+           
+           ipcRenderer.send('control', { action: 'toggleRepeat' });
+         
+           ignoreServerRepeatState = true;
+           setTimeout(() => {
+             ignoreServerRepeatState = false;
+           }, 500);
+         });
+         
+         slider.addEventListener('mousedown', () => { isDragging = true; });
+slider.addEventListener('change', () => {
+           isDragging = false;
+           const percentage = slider.value / 1000;
+           ipcRenderer.send('control', { action: 'seek', value: percentage });
+         });
+         slider.addEventListener('input', () => {
+             const percentage = (slider.value / slider.max) * 100;
+             slider.style.setProperty('--progress-percent', `${percentage}%`);
+             slider.style.setProperty('--preview-percent', `${percentage}%`);
+         });
+         slider.addEventListener('mouseenter', handleSliderMouseEnter);
+         slider.addEventListener('mousemove', handleSliderMouseMove);
+         slider.addEventListener('mouseleave', handleSliderMouseLeave);
+         
+         updateSliderStyle();
+         
+         function animateBorder(timestamp) {
+             if (!totalLength || !config.enableBorderAnimation) return;
+             
+             if (lastTimestamp === 0) {
+                 lastTimestamp = timestamp;
+             }
+             const deltaTime = (timestamp - lastTimestamp) / 1000; 
+         
+             const distanceToMove = speedFactor * deltaTime;
+             currentOffset -= distanceToMove;
+         
+             if (currentOffset < 0) {
+                 currentOffset += totalLength;
+             }
+         
+             linePath.style.strokeDashoffset = currentOffset;
+             lastTimestamp = timestamp;
+             requestAnimationFrame(animateBorder);
+         }
+         
+         function setupBorderAnimation() {
+           linePath = document.getElementById('line-path');
+           if (!linePath) return;
+         
+           if (config.enableBorderGlow) {
+               linePath.setAttribute('filter', 'url(#glow)');
+           } else {
+               linePath.removeAttribute('filter');
+           }
+         
+           const lineLength = 150; 
+           totalLength = linePath.getTotalLength();
+           
+           const gapLength = (totalLength - (2 * lineLength)) / 2;
+           
+           if (gapLength < 0) {
+               return;
+           }
+           
+           linePath.style.setProperty('--line-length', lineLength);
+           linePath.style.setProperty('--gap-length', gapLength);
+           
+           currentOffset = totalLength;
+           linePath.style.strokeDashoffset = currentOffset;
+         
+           requestAnimationFrame(animateBorder);
+         }
+         
+         ipcRenderer.on('toggle-settings', toggleSettings);
+         function toggleSettings() {
+            settingsVisible = !settingsVisible;
+
+            if (settingsVisible) {
+                settingsPanel.style.display = 'flex';
+                requestAnimationFrame(() => {
+                overlayEl.classList.add('settings-open');
+                });
+            } else {
+                overlayEl.classList.remove('settings-open');
+            }
+         }
+         settingsBtn.addEventListener('click', toggleSettings);
+
+         
+         settingsPanel.addEventListener('transitionend', () => {
+         if (!overlayEl.classList.contains('settings-open')) {
+             settingsPanel.style.display = 'none';
+         }
+         });
+        toggleBorderAnim.addEventListener('change', (e) => {
+        config.enableBorderAnimation = e.target.checked;
+        saveSettings();
+        if (config.enableBorderAnimation) {
+            borderSvg.style.display = 'block';
+            // Wywołaj funkcję setup, która obliczy wszystko od nowa i uruchomi pętlę.
+            setupBorderAnimation(); 
+        } else {
+            borderSvg.style.display = 'none';
+        }
+        });
+         
+         toggleBorderGlow.addEventListener('change', (e) => {
+           config.enableBorderGlow = e.target.checked;
+           saveSettings();
+           if (linePath) {
+             if (config.enableBorderGlow) {
+               linePath.setAttribute('filter', 'url(#glow)');
+             } else {
+               linePath.removeAttribute('filter');
+             }
+           }
+         });
+         
+         toggleBassAnim.addEventListener('change', (e) => {
+           config.enableBassBackgroundAnimation = e.target.checked;
+           saveSettings();
+           if (!config.enableBassBackgroundAnimation) {
+             overlayEl.style.setProperty('--bg-scale', 1);
+           }
+         });
+         toggleStaticImage.addEventListener('change', (e) => {
+            const isEnabled = e.target.checked;
+            config.enableStaticImage = isEnabled;
+            saveSettings();
+            ipcRenderer.send('control', { action: 'setStaticImage', value: isEnabled });
+        });
+         document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+             toggleBorderAnim.checked = config.enableBorderAnimation;
+             toggleBorderGlow.checked = config.enableBorderGlow;
+             toggleBassAnim.checked = config.enableBassBackgroundAnimation;
+             toggleStaticImage.checked = config.enableStaticImage;
+         
+             if (config.enableBorderAnimation) {
+                 setupBorderAnimation();
+             } else {
+                 if (borderSvg) borderSvg.style.display = 'none';
+             }
+             setDefaultBorderGradient();
+         });
+      </script>
+   </body>
+</html>
