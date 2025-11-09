@@ -21,4 +21,4 @@ In the settings you can change the outline overlay, background reaction to music
 
 The overlay background and its colors synchronize with the song
 
-![3](https://github.com/user-attachments/assets/a77da7c8-10d0-40d9-b93e-b9f9763a75f3)
+![3](https://github.com/user-attachments/assets/6dc2e593-03fd-4ea0-9ebe-c589d0756f6b)
