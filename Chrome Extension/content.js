@@ -65,52 +65,78 @@
     }
 
 	const BASS_SENSITIVITY = 0.8;
+	const MAX_VOL_THRESHOLD = 0.7533; 
 
-    function analyzeFrequencyRange() {
-        if (!analyser || (audioContext && audioContext.state === 'suspended')) {
-            animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
-            return;
-        }
+	function analyzeFrequencyRange() {
+		if (!analyser || (audioContext && audioContext.state === 'suspended')) {
+			animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
+			return;
+		}
 
-        analyser.getByteFrequencyData(fullFrequencyDataArray);
-        let totalLoudness = 0;
-        for (let i = lowerBin; i <= upperBin; i++) {
-            totalLoudness += fullFrequencyDataArray[i];
-        }
+		const vol = connectedVideoElement ? connectedVideoElement.volume : 1;
+		const isMuted = connectedVideoElement ? connectedVideoElement.muted : false;
 
-        const rangeSize = (upperBin - lowerBin) + 1;
-        let averageLoudness = rangeSize > 0 ? (totalLoudness / rangeSize) : 0;
+		if (vol >= MAX_VOL_THRESHOLD && !isMuted) {
+			
+			analyser.getByteFrequencyData(fullFrequencyDataArray);
+			let totalLoudness = 0;
+			for (let i = lowerBin; i <= upperBin; i++) {
+				totalLoudness += fullFrequencyDataArray[i];
+			}
+			const rangeSize = (upperBin - lowerBin) + 1;
+			const averageLoudness = rangeSize > 0 ? (totalLoudness / rangeSize) : 0;
+			const scaledValue = (averageLoudness / 255) * CONSOLE_SCALE_MAX;
+			currentBassIntensity = scaledValue;
+			if (typeof analyzeFrequencyRange.lastBass !== "undefined") {
+				if (Math.abs(currentBassIntensity - analyzeFrequencyRange.lastBass) < 0.0001) {
+					currentBassIntensity = Math.max(0, currentBassIntensity - 0.01);
+				}
+			}
+			analyzeFrequencyRange.lastBass = currentBassIntensity;
+			animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
 
-        if (connectedVideoElement) {
-            const vol = connectedVideoElement.volume;
-            const isMuted = connectedVideoElement.muted;
+		} else {
+			
+			analyser.getByteFrequencyData(fullFrequencyDataArray);
+			let totalLoudness = 0;
+			for (let i = lowerBin; i <= upperBin; i++) {
+				totalLoudness += fullFrequencyDataArray[i];
+			}
 
-            if (isMuted || vol <= 0) {
-                averageLoudness = 0;
-            } else {
-                const smoothVol = (vol * 0.7) + 0.3; 
-                averageLoudness = averageLoudness / smoothVol;
+			const rangeSize = (upperBin - lowerBin) + 1;
+			let averageLoudness = rangeSize > 0 ? (totalLoudness / rangeSize) : 0;
 
-                if (vol < 0.15) {
-                    averageLoudness *= (vol + 0.5); 
-                }
-            }
-        }
+			if (connectedVideoElement) {
+				const v = connectedVideoElement.volume;
+				const m = connectedVideoElement.muted;
 
-        let scaledValue = (averageLoudness / 255) * CONSOLE_SCALE_MAX * BASS_SENSITIVITY;
+				if (m || v <= 0) {
+					averageLoudness = 0;
+				} else {
+					const smoothVol = (v * 0.7) + 0.3; 
+					averageLoudness = averageLoudness / smoothVol;
 
-        if (scaledValue > CONSOLE_SCALE_MAX) scaledValue = CONSOLE_SCALE_MAX;
-        
-        currentBassIntensity = scaledValue;
+					if (v < 0.15) {
+						averageLoudness *= (v + 0.5); 
+					}
+				}
+			}
 
-        if (typeof analyzeFrequencyRange.lastBass !== "undefined") {
-            if (Math.abs(currentBassIntensity - analyzeFrequencyRange.lastBass) < 0.0001) {
-                currentBassIntensity = Math.max(0, currentBassIntensity - 0.01);
-            }
-        }
-        analyzeFrequencyRange.lastBass = currentBassIntensity;
-        animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
-    }
+			let scaledValue = (averageLoudness / 255) * CONSOLE_SCALE_MAX * BASS_SENSITIVITY;
+
+			if (scaledValue > CONSOLE_SCALE_MAX) scaledValue = CONSOLE_SCALE_MAX;
+			
+			currentBassIntensity = scaledValue;
+
+			if (typeof analyzeFrequencyRange.lastBass !== "undefined") {
+				if (Math.abs(currentBassIntensity - analyzeFrequencyRange.lastBass) < 0.0001) {
+					currentBassIntensity = Math.max(0, currentBassIntensity - 0.01);
+				}
+			}
+			analyzeFrequencyRange.lastBass = currentBassIntensity;
+			animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
+		}
+	}
 
     function handlePlay() {
         if (audioContext && audioContext.state === 'suspended') {
