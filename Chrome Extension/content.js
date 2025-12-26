@@ -64,20 +64,45 @@
         return { running, shuffle, repeat };
     }
 
+	const BASS_SENSITIVITY = 0.8;
+
     function analyzeFrequencyRange() {
         if (!analyser || (audioContext && audioContext.state === 'suspended')) {
             animationFrameId = requestAnimationFrame(analyzeFrequencyRange);
             return;
         }
+
         analyser.getByteFrequencyData(fullFrequencyDataArray);
         let totalLoudness = 0;
         for (let i = lowerBin; i <= upperBin; i++) {
             totalLoudness += fullFrequencyDataArray[i];
         }
+
         const rangeSize = (upperBin - lowerBin) + 1;
-        const averageLoudness = rangeSize > 0 ? (totalLoudness / rangeSize) : 0;
-        const scaledValue = (averageLoudness / 255) * CONSOLE_SCALE_MAX;
+        let averageLoudness = rangeSize > 0 ? (totalLoudness / rangeSize) : 0;
+
+        if (connectedVideoElement) {
+            const vol = connectedVideoElement.volume;
+            const isMuted = connectedVideoElement.muted;
+
+            if (isMuted || vol <= 0) {
+                averageLoudness = 0;
+            } else {
+                const smoothVol = (vol * 0.7) + 0.3; 
+                averageLoudness = averageLoudness / smoothVol;
+
+                if (vol < 0.15) {
+                    averageLoudness *= (vol + 0.5); 
+                }
+            }
+        }
+
+        let scaledValue = (averageLoudness / 255) * CONSOLE_SCALE_MAX * BASS_SENSITIVITY;
+
+        if (scaledValue > CONSOLE_SCALE_MAX) scaledValue = CONSOLE_SCALE_MAX;
+        
         currentBassIntensity = scaledValue;
+
         if (typeof analyzeFrequencyRange.lastBass !== "undefined") {
             if (Math.abs(currentBassIntensity - analyzeFrequencyRange.lastBass) < 0.0001) {
                 currentBassIntensity = Math.max(0, currentBassIntensity - 0.01);
